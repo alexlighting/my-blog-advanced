@@ -1,0 +1,650 @@
+definitions:
+  handler.CommentsResponse:
+    properties:
+      comments:
+        items:
+          $ref: '#/definitions/model.Comment'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      post_id:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.PostsResponse:
+    properties:
+      author_id:
+        type: integer
+      limit:
+        type: integer
+      offset:
+        type: integer
+      posts:
+        items:
+          $ref: '#/definitions/model.Post'
+        type: array
+      total:
+        type: integer
+    type: object
+  model.Comment:
+    properties:
+      author_id:
+        type: integer
+      content:
+        maxLength: 1000
+        minLength: 1
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      post_id:
+        type: integer
+      updated_at:
+        type: string
+    required:
+    - content
+    type: object
+  model.CommentUpdateRequest:
+    properties:
+      content:
+        maxLength: 1000
+        minLength: 1
+        type: string
+    required:
+    - content
+    type: object
+  model.Post:
+    properties:
+      author_id:
+        type: integer
+      content:
+        maxLength: 100000
+        minLength: 1
+        type: string
+      created_at:
+        type: string
+      draft:
+        type: boolean
+      id:
+        type: integer
+      publish_at:
+        type: string
+      title:
+        maxLength: 200
+        minLength: 1
+        type: string
+      updated_at:
+        type: string
+    required:
+    - content
+    - title
+    type: object
+  model.PostCreateRequest:
+    properties:
+      content:
+        maxLength: 100000
+        minLength: 1
+        type: string
+      publish_at:
+        type: string
+      title:
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - content
+    - title
+    type: object
+  model.PostUpdateRequest:
+    properties:
+      content:
+        maxLength: 100000
+        minLength: 1
+        type: string
+      publish_at:
+        type: string
+      title:
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - content
+    - title
+    type: object
+  model.TokenResponse:
+    properties:
+      expiresAt:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/model.UserResponse'
+    type: object
+  model.UserCreateRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 255
+        minLength: 6
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  model.UserLoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 255
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  model.UserResponse:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      username:
+        type: string
+    type: object
+info:
+  contact:
+    email: alex.derakchev@gmail.com
+    name: alex.derakchev
+  description: Back-end для блог-платформы с поддержкой постов и комментариев к ним.
+  title: blog-api
+  version: "1.0"
+paths:
+  /api/comments/{id}:
+    get:
+      parameters:
+      - description: ID искомого комментария
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект с данными комментария
+          schema:
+            $ref: '#/definitions/model.Comment'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "404":
+          description: комемнтарий с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка БД
+          schema:
+            type: string
+      summary: Получение комментария по ID
+      tags:
+      - comments
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID изменяемого комментария
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CommentUpdateRequest'
+      - description: ID изменяемого комментария
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект с данными измененного комментария
+          schema:
+            $ref: '#/definitions/model.Comment'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "403":
+          description: попытка изменить чужой комментарий
+          schema:
+            type: string
+        "404":
+          description: комментарий с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка БД
+          schema:
+            type: string
+      summary: Изменение комментария
+      tags:
+      - comments
+  /api/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: данные для входа
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Токен авторизации
+          schema:
+            $ref: '#/definitions/model.TokenResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "401":
+          description: ошибка авторизации
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка подписи токена
+          schema:
+            type: string
+      summary: Авторизация пользователя
+      tags:
+      - users
+  /api/porfile:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект с данными пользователя
+          schema:
+            $ref: '#/definitions/model.UserResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "401":
+          description: ошибка авторизации
+          schema:
+            type: string
+        "404":
+          description: пользователь не найден в БД
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Профиль пользователя
+      tags:
+      - users
+  /api/posts:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: данные нового поста
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.PostCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: объект с данными созданного поста
+          schema:
+            $ref: '#/definitions/model.Post'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "401":
+          description: попытка создать пост не авторизовавшись
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка записи в базу данных
+          schema:
+            type: string
+      summary: Создание нового поста
+      tags:
+      - posts
+  /api/posts/{id}:
+    delete:
+      parameters:
+      - description: ID удаляемого поста
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "403":
+          description: попытка удалить чужой пост
+          schema:
+            type: string
+        "404":
+          description: пост с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Удаление поста
+      tags:
+      - posts
+    get:
+      parameters:
+      - description: ID искомого поста
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект с данными искомого поста
+          schema:
+            $ref: '#/definitions/model.Post'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "404":
+          description: пост с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Получение поста по ID
+      tags:
+      - posts
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID искомого поста
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.PostUpdateRequest'
+      - description: ID изменяемого поста
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект с данными измененного поста
+          schema:
+            $ref: '#/definitions/model.Post'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "403":
+          description: попытка изменить чужой пост
+          schema:
+            type: string
+        "404":
+          description: пост с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Изменение поста
+      tags:
+      - posts
+  /api/posts/{id}/comments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: данные нового поста
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.PostCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: объект с данными созданного поста
+          schema:
+            $ref: '#/definitions/model.Post'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "401":
+          description: попытка создать пост не авторизовавшись
+          schema:
+            type: string
+        "404":
+          description: не найден пост
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка записи в базу данных
+          schema:
+            type: string
+      summary: Создание нового комментария
+      tags:
+      - comments
+  /api/posts/{id}/comments{limit}{offset}:
+    get:
+      parameters:
+      - description: ID искомого поста
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: количество комментариев на страницу
+        in: path
+        name: limit
+        required: true
+        type: integer
+      - description: смещение от начала списка
+        in: path
+        name: offset
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект со списком комментариев, общим количеством комментариев
+            лимитом и смещением
+          schema:
+            $ref: '#/definitions/handler.CommentsResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "404":
+          description: комемнтарий с таким ID не найден
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка БД
+          schema:
+            type: string
+      summary: Получение комментария по ID
+      tags:
+      - comments
+  /api/posts/author/{authorID}{limit}{offset}:
+    get:
+      parameters:
+      - description: ID автора
+        in: path
+        name: authorID
+        required: true
+        type: integer
+      - description: количество постов на страницу
+        in: path
+        name: limit
+        required: true
+        type: integer
+      - description: смещение от начала списка
+        in: path
+        name: offset
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект со списком постов, общим количеством постов лимитом
+            и смещением
+          schema:
+            $ref: '#/definitions/handler.PostsResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Получение списка постов автора с лимитом и пагинацией
+      tags:
+      - posts
+  /api/posts{limit}{offset}:
+    get:
+      parameters:
+      - description: количество постов на страницу
+        in: path
+        name: limit
+        required: true
+        type: integer
+      - description: смещение от начала списка
+        in: path
+        name: offset
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: объект со списком постов, общим количеством постов лимитом
+            и смещением
+          schema:
+            $ref: '#/definitions/handler.PostsResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+      summary: Получение списка постов с лимитом и пагинацией
+      tags:
+      - posts
+  /api/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Парамеры нового пользователя
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Токен авторизации
+          schema:
+            $ref: '#/definitions/model.TokenResponse'
+        "400":
+          description: неправильные параметры
+          schema:
+            type: string
+        "405":
+          description: неподдерживаемый метод
+          schema:
+            type: string
+        "409":
+          description: пользователь с таким именем уже существует
+          schema:
+            type: string
+        "500":
+          description: ошибка записи в базу данных
+          schema:
+            type: string
+      summary: Зарегистрировать нового пользователя
+      tags:
+      - users
+swagger: "2.0"
