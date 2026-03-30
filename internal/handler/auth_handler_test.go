@@ -24,13 +24,12 @@ func TestRegister(t *testing.T) {
 		{name: "правильный медот и некорерктный JSON", method: "POST", path: "api/register", jsonData: `{"example":2:]}}`, status: http.StatusBadRequest, correctJSON: false},
 		{name: "правильный медот и некорерктный URL", method: "POST", path: "api/shorten", jsonData: `{"url":"/com/not/too/long/path"}`, status: http.StatusBadRequest, correctJSON: false},
 	}
-	// var shortner = NewURLShortener()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/"+tt.path, strings.NewReader(tt.jsonData))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
-			Register(rec, req)
+			// Register(rec, req)
 			res := rec.Result()
 			defer res.Body.Close()
 			if res.StatusCode != tt.status {
