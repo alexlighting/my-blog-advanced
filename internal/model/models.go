@@ -1,7 +1,11 @@
 package model
 
 import (
+	"context"
+	"reflect"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // User представляет модель пользователя в системе
@@ -16,14 +20,14 @@ type User struct {
 
 // Post представляет модель поста в блоге
 type Post struct {
-	ID         int       `json:"id" db:"id" validate:"numeric"`
-	Title      string    `json:"title" db:"title" validate:"required,min=1,max=200"`
-	Content    string    `json:"content" db:"content" validate:"required,min=1,max=100000"`
-	AuthorID   int       `json:"author_id" db:"author_id" validate:"numeric"`
-	Draft      bool      `json:"draft" db:"draft" validate:"boolean"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at" validate:"omitempty"`
-	UpdatedAt  time.Time `json:"updated_at" db:"updated_at" validate:"omitempty"`
-	Publish_at time.Time `json:"publish_at" db:"publish_at" validate:"omitempty"`
+	ID         int       `json:"id" db:"id" validate:"numeric" redis:"id"`
+	Title      string    `json:"title" db:"title" validate:"required,min=1,max=200" redis:"title"`
+	Content    string    `json:"content" db:"content" validate:"required,min=1,max=100000" redis:"content"`
+	AuthorID   int       `json:"author_id" db:"author_id" validate:"numeric" redis:"author_id"`
+	Draft      bool      `json:"draft" db:"draft" validate:"boolean" redis:"draft"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at" validate:"omitempty" redis:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at" db:"updated_at" validate:"omitempty" redis:"updated_at"`
+	Publish_at time.Time `json:"publish_at" db:"publish_at" validate:"omitempty" redis:"publish_at"`
 }
 
 // Comment представляет модель комментария к посту
@@ -135,4 +139,35 @@ func (comment Comment) CanBeEditedBy(userID int) bool {
 // Comment.CanBeDeletedBy(userID int) bool - проверяет, может ли пользователь удалить комментарий
 func (comment Comment) CanBeDeletedBy(userID int) bool {
 	return comment.AuthorID == userID
+}
+
+func (p *Post) ToRedisSet(ctx context.Context, db *redis.Client, key string) error {
+	// Получаем элементы структуры
+	val := reflect.ValueOf(p).Elem()
+
+	// Создаем функцию для записи структуры в хранилище
+	settter := func(pipe redis.Pipeliner) error {
+		// Итерируемся по полям структуры
+		for i := 0; i < val.NumField(); i++ {
+			field := val.Type().Field(i)
+			// Получаем содержимое тэга redis
+			tag := field.Tag.Get("redis")
+			// Записываем значение поля и содержимое тэга redis в хранилище
+			if err := pipe.HSet(ctx, key, tag, val.Field(i).Interface()).Err(); err != nil {
+				return err
+			}
+		}
+		// Задаем время хранения 2 минуты
+		if err := pipe.Expire(ctx, key, 2*time.Minute).Err(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Сохраняем структуру в хранилище
+	if _, err := db.Pipelined(ctx, settter); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -349,7 +349,7 @@ paths:
           schema:
             type: string
         "500":
-          description: ошибка записи в базу данных
+          description: ошибка записи в базу данных/кэш
           schema:
             type: string
       summary: Создание нового поста
@@ -411,6 +411,10 @@ paths:
           description: неподдерживаемый метод
           schema:
             type: string
+        "500":
+          description: ошибка записи в кэш
+          schema:
+            type: string
       summary: Получение поста по ID
       tags:
       - posts
@@ -450,6 +454,10 @@ paths:
             type: string
         "405":
           description: неподдерживаемый метод
+          schema:
+            type: string
+        "500":
+          description: ошибка записи в кэш
           schema:
             type: string
       summary: Изменение поста

@@ -290,7 +290,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "ошибка записи в базу данных",
+                        "description": "ошибка записи в базу данных/кэш",
                         "schema": {
                             "type": "string"
                         }
@@ -394,6 +394,12 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "500": {
+                        "description": "ошибка записи в кэш",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             },
@@ -453,6 +459,12 @@ const docTemplate = `{
                     },
                     "405": {
                         "description": "неподдерживаемый метод",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "ошибка записи в кэш",
                         "schema": {
                             "type": "string"
                         }

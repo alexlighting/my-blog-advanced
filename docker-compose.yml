@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: blog_postgres
+    container_name: blog_postgres_advanced
     environment:
       POSTGRES_USER: bloguser
       POSTGRES_PASSWORD: blogpassword
@@ -19,11 +19,23 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      REDIS_PASSWORD: mypassword
+      REDIS_DATABASES: 16
+      REDIS_MAXMEMORY: 512mb
+      REDIS_APPENDONLY: "yes"
 
   # Опциональный веб-интерфейс для управления БД
   adminer:
     image: adminer:latest
-    container_name: blog_adminer
+    container_name: blog_adminer_advanced
     ports:
       - "8081:8080"
     environment:
@@ -35,3 +47,6 @@ services:
 volumes:
   postgres_data:
     name: blog_postgres_data
+
+  redis_data:
+    name: redis_data

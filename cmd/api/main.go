@@ -21,6 +21,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+
+	// "github.com/redis/go-redis/v9"
 	"github.com/joho/godotenv"
 )
 
@@ -75,6 +77,25 @@ func main() {
 		logger.Printf("Error migrate db: %v", err)
 		panic("Can't migrate DB")
 	}
+
+	//подключаемся к кеш Redis
+	redisConfig := database.RedisConfig{
+		Addr: fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
+		// User:        cfg.RedisUser,
+		Password:    cfg.RedisPassword,
+		DB:          0,
+		MaxRetries:  cfg.RedisMaxRetries,
+		DialTimeout: time.Duration(cfg.RedisDialTimeout) * time.Second,
+		Timeout:     time.Duration(cfg.RedisTimeout) * time.Second,
+	}
+	redis, err := database.NewRedisClient(ctx, redisConfig)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Redis ready to work")
+	// redis.Ping(ctx)
+	//TODO дописать работу с Redis
+
 	//создаем валидатор
 	validate := validator.New()
 
@@ -116,7 +137,7 @@ func main() {
 	commenService := service.NewCommentService(commentRepo, postRepo, userRepo, logger)
 	// 3. Хендлеры (передать сервисы)
 	authHandler := handler.NewAuthHandler(userService, validate, logger)
-	postHandler := handler.NewPostHandler(postService, validate)
+	postHandler := handler.NewPostHandler(postService, validate, redis)
 	commentHandler := handler.NewCommentHandler(commenService, validate)
 	// 4. Middleware (передать необходимые зависимости)
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)
@@ -247,6 +268,15 @@ type Config struct {
 
 	// Shutdown, second
 	ShutdownTimeout int
+
+	// Redis
+	RedisHost        string
+	RedisPort        int
+	RedisUser        string
+	RedisPassword    string
+	RedisMaxRetries  int
+	RedisDialTimeout int
+	RedisTimeout     int
 }
 
 // loadConfig загружает конфигурацию из переменных окружения
@@ -266,6 +296,13 @@ func loadConfig() *Config {
 	conf.JWTExpiryHours = getEnvAsInt("JWT_EXPIRY_HOURS", 24)
 	conf.CacheTTLMinutes = getEnvAsInt("CACHE_TTL_MINUTES", 5)
 	conf.ShutdownTimeout = getEnvAsInt("ShutdownTimeout", 5)
+	conf.RedisHost = getEnv("REDIS_HOST", "localhost")
+	conf.RedisPort = getEnvAsInt("REDIS_PORT", 6380)
+	conf.RedisUser = getEnv("REDIS_USER", "RedisUser")
+	conf.RedisPassword = getEnv("REDIS_PASSWORD", "mypassword")
+	conf.RedisMaxRetries = getEnvAsInt("REDIS_MAX_RETRIES", 5)
+	conf.RedisDialTimeout = getEnvAsInt("REDIS_DIAL_TIMEOUT", 10)
+	conf.RedisTimeout = getEnvAsInt("REDIS_TIMEOUT", 5)
 	return &conf
 }
 

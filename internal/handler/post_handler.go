@@ -3,17 +3,20 @@ package handler
 import (
 	"blog-api/internal/model"
 	"blog-api/internal/service"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/redis/go-redis/v9"
 )
 
 type PostHandler struct {
 	postService *service.PostService
 	validate    *validator.Validate
+	redis       *redis.Client
 }
 
 type PostsResponse struct {
@@ -24,10 +27,11 @@ type PostsResponse struct {
 	AuthorID int           `json:"author_id"`
 }
 
-func NewPostHandler(postService *service.PostService, validator *validator.Validate) *PostHandler {
+func NewPostHandler(postService *service.PostService, validator *validator.Validate, redis *redis.Client) *PostHandler {
 	return &PostHandler{
 		postService: postService,
 		validate:    validator,
+		redis:       redis,
 	}
 }
 
@@ -43,7 +47,7 @@ func NewPostHandler(postService *service.PostService, validator *validator.Valid
 // @Failure      400  {string}  string "неправильные параметры"
 // @Failure      401  {string}  string "попытка создать пост не авторизовавшись"
 // @Failure      405  {string}  string "неподдерживаемый метод"
-// @Failure      500  {string}  string "ошибка записи в базу данных"
+// @Failure      500  {string}  string "ошибка записи в базу данных/кэш"
 // @Router /api/posts [POST]
 func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса (должен быть POST)
@@ -83,6 +87,13 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, err.Error(), status)
 		return
 	}
+	err = post.ToRedisSet(r.Context(), h.redis, strconv.Itoa(post.ID))
+	if err != nil {
+		//беда случилась, редис отвалился
+		sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Printf("Положили в кэш пост с id=%d\n", post.ID)
 	sendJSONResponse(w, post, http.StatusCreated)
 }
 
@@ -97,6 +108,7 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {string}  string "неправильные параметры"
 // @Failure      404  {string}  string "пост с таким ID не найден"
 // @Failure      405  {string}  string "неподдерживаемый метод"
+// @Failure      500  {string}  string "ошибка записи в кэш"
 // @Router /api/posts/{id} [GET]
 func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса (должен быть GET)
@@ -114,7 +126,18 @@ func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 	// Получаем пост через postService.GetByID
 	postID := int(id)
-	post, err := h.postService.GetByID(r.Context(), postID)
+	//пробуем забать пост из кэша
+	post := new(model.Post)
+	err = h.redis.HGetAll(r.Context(), strconv.Itoa(postID)).Scan(post)
+	//если пост есть в кэше, то возвращаем его
+	if err == nil && (*post != model.Post{}) {
+		fmt.Printf("Отдали пост с id=%d из кэша\n", postID)
+		sendJSONResponse(w, post, http.StatusOK)
+		return
+	}
+
+	//если в кэше такого поста нет то берем из базы
+	post, err = h.postService.GetByID(r.Context(), postID)
 	if err != nil {
 		if err == service.ErrPostNotFound {
 			sendErrorResponse(w, err.Error(), http.StatusNotFound)
@@ -123,6 +146,13 @@ func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	err = post.ToRedisSet(r.Context(), h.redis, strconv.Itoa(postID))
+	if err != nil {
+		//беда случилась, редис отвалился
+		sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Printf("Положили в кэш пост с id=%d\n", postID)
 	sendJSONResponse(w, post, http.StatusOK)
 }
 
@@ -179,6 +209,7 @@ func (h *PostHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 // @Failure      403  {string}  string "попытка изменить чужой пост"
 // @Failure      404  {string}  string "пост с таким ID не найден"
 // @Failure      405  {string}  string "неподдерживаемый метод"
+// @Failure      500  {string}  string "ошибка записи в кэш"
 // @Router /api/posts/{id} [PUT]
 func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Проверяем метод запроса (должен быть PUT)
@@ -226,6 +257,15 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, err.Error(), status)
 		return
 	}
+	//обновляем кэш
+	err = post.ToRedisSet(r.Context(), h.redis, strconv.Itoa(postID))
+	if err != nil {
+		//беда случилась, редис отвалился
+		sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Printf("Обновили в кэш пост с id=%d\n", postID)
+
 	// Возвращаем обновленный пост как JSON (200 OK)
 	sendJSONResponse(w, post, http.StatusOK)
 }
@@ -274,6 +314,16 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, err.Error(), status)
 		return
 	}
+
+	err = h.redis.Del(r.Context(), strconv.Itoa(postID)).Err()
+	if err != nil {
+		//беда случилась, редис отвалился
+		// sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		fmt.Printf("Ошибка при удалении из кеша поста с id %d:%s\n", postID, err.Error())
+	} else {
+		fmt.Printf("Положили в кэш пост с id=%d\n", postID)
+	}
+
 	sendJSONResponse(w, "", http.StatusNoContent)
 }
 
