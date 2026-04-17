@@ -37,7 +37,7 @@ blog-api/
 │      ├── postgres.go   # Коненктор к БД postgres
 │      └── redis.go      # Инициация кеш Redis
 ├── migrations/          # SQL миграции
-├── docker-compose.yml   # PostgreSQL и Adminer
+├── docker-compose.yml   # PostgreSQL и Adminer, Redis
 ├── .env.example         # Пример конфигурации
 ├── go.mod
 └── README.md
